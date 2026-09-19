@@ -229,7 +229,7 @@ def _widest(row: Row) -> float:
 
 
 def _empty_floor(metric: str) -> NoiseFloor:
-    return NoiseFloor(metric, (), (), 0.0, 0.0, 0.0, False)
+    return NoiseFloor(metric, (), (), 0.0, 0.0, 0.0, False, 0.0)
 
 
 def _assess(rows: Sequence[Row], floor: NoiseFloor) -> Validity:
@@ -262,3 +262,19 @@ def baseline_haze(report: Report) -> float:
     if not report.baseline:
         return 0.0
     return sum(normalised_entropy(r.distribution) for r in report.baseline) / len(report.baseline)
+
+
+def agreed_entropy_shift(row: Row) -> float | None:
+    """The entropy change both perturbation modes support, or None.
+
+    The conservative reading: the smaller of the two magnitudes, and only when
+    the modes agree on direction. Deleting text shortens the document, which
+    tends to sharpen any reading on its own; requiring the mask to agree keeps
+    that artefact from being reported as a source of ambiguity.
+    """
+    values = [e.entropy_delta for e in row.effects.values() if e.ok]
+    if not values:
+        return None
+    if len({v >= 0 for v in values}) > 1:
+        return None
+    return min(values, key=abs)

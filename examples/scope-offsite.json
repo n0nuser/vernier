@@ -1,0 +1,8 @@
+{
+  "type": "choice",
+  "instructions": "A maintainer posted abusive remarks about a contributor from their personal social media account, outside any project space and without identifying themselves as a maintainer. Under this Code of Conduct, is that conduct within the scope of enforcement?",
+  "criteria": {
+    "in_scope": "The Code of Conduct as written reaches this conduct and it may be enforced against",
+    "out_of_scope": "The Code of Conduct as written does not reach this conduct"
+  }
+}

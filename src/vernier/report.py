@@ -7,7 +7,7 @@ from typing import Iterable, Sequence
 
 from .distance import normalised_entropy
 from .noise import ALPHA, Effect, Verdict
-from .run import Report, Row, baseline_haze
+from .run import Report, Row, agreed_entropy_shift, baseline_haze
 from .types import Reading
 
 BAR = "█"
@@ -120,6 +120,9 @@ def _baseline_block(report: Report) -> list[str]:
     out.append(f"  floor             {floor.value:.4f}   limited by {floor.limited_by}")
     out.append(
         f"  threshold         {floor.threshold:.4f}   floor + one resolution step"
+    )
+    out.append(
+        f"  entropy spread    {floor.entropy_spread:.4f}   the floor haze is read against"
     )
     if floor.saturated:
         out.append(
@@ -236,6 +239,16 @@ def _interval(row: Row, modes: Iterable[str]) -> str:
     return "   ".join(parts)
 
 
+def _widest_size(row: Row) -> float:
+    """The largest effect size any mode measured for this segment."""
+    return max((e.size for e in row.effects.values() if e.ok), default=0.0)
+
+
+def _detectable(row: Row) -> bool:
+    """True when a mode separated this segment from jitter despite its small size."""
+    return any(e.ok and e.p_value <= ALPHA for e in row.effects.values())
+
+
 def _null_block(report: Report) -> list[str]:
     modes = [m.value for m in report.config.modes]
     out: list[str] = []
@@ -253,8 +266,8 @@ def _null_block(report: Report) -> list[str]:
         out.append("")
     rows = report.inside_noise
     out.append(
-        f"INSIDE THE NOISE  ({len(rows)} segments — every reading stayed under "
-        f"{report.floor.threshold:.4f})"
+        f"INSIDE THE NOISE  ({len(rows)} segments — effect under "
+        f"{report.floor.threshold:.4f} in both modes)"
     )
     for row in rows:
         out.append(f"      {_trim(row.segment.label, 40):<40} {_interval(row, modes)}")
@@ -266,25 +279,46 @@ def render_deadweight(report: Report) -> str:
     out = render_text(report, show_null=False).split("\n")
     if report.aborted or not report.validity.ok:
         return "\n".join(out)
+    modes = [m.value for m in report.config.modes]
     rows = report.inside_noise
     out.append("")
     out.append(f"DEADWEIGHT  ({len(rows)} of {len(report.content_rows)} segments)")
     out.append(
-        "  Removing any of these moved the distribution less than the instrument can"
+        f"  Removing any of these moved the answer by less than {report.floor.threshold:.4f}"
     )
     out.append(
-        f"  distinguish from noise ({report.floor.threshold:.4f} {report.metric})."
+        f"  {report.metric}, the floor this run measured, under both perturbation modes"
     )
+    out.append("  and with enough replicates to have seen a larger effect.")
     out.append("")
     if not rows:
         out.append("  None. Every segment carries measurable weight on this question.")
-        return "\n".join(out)
-    scale = _scale(report.content_rows) or 1.0
-    for row in rows:
-        best = max((e.high for e in row.effects.values() if e.ok), default=0.0)
+    else:
+        scale = _scale(report.content_rows) or 1.0
+        for row in rows:
+            size = _widest_size(row)
+            note = " (real but negligible)" if _detectable(row) else ""
+            out.append(
+                f"      {_trim(row.segment.label, 38):<38} \u2264{size:.4f}"
+                f"  {_bar(size, scale, 12)}{note}"
+            )
+        if any(_detectable(r) for r in rows):
+            out.append("")
+            out.append(
+                "  'real but negligible' means the movement repeated too consistently to"
+            )
+            out.append(
+                "  be jitter, and is still smaller than this run can call meaningful."
+            )
+    undecided = report.indeterminate
+    if undecided:
+        out.append("")
         out.append(
-            f"      {_trim(row.segment.label, 42):<42} ≤{best:.4f}  {_bar(best, scale)}"
+            f"  NOT deadweight, and not a finding either ({len(undecided)}): these moved"
         )
+        out.append("  further than the floor without repeating consistently enough to assert.")
+        for row in undecided:
+            out.append(f"   ?  {_trim(row.segment.label, 38):<38} {_interval(row, modes)}")
     out.append("")
     out.append("  Deadweight is a claim about this question only. A segment that is inert")
     out.append("  here may carry the whole verdict on another.")
@@ -334,25 +368,32 @@ def _haze_verdict(haze: float, report: Report) -> list[str]:
 
 def _haze_by_segment(report: Report) -> list[str]:
     """Where the ambiguity lives: which removals sharpen or blur the reading."""
-    rows = [r for r in report.content_rows if any(e.ok for e in r.effects.values())]
-    scored = sorted(
-        rows,
-        key=lambda r: min(e.entropy_delta for e in r.effects.values() if e.ok),
-    )
+    floor = report.floor.entropy_spread
     out = [
         "WHERE THE AMBIGUITY LIVES  (change in entropy when a segment is removed)",
-        "  negative = removing it sharpens the reading, so it was a source of the haze",
-        "  positive = removing it blurs the reading, so it was resolving the haze",
+        "  sharpens = removing it left the reading more decided, so that section was a",
+        "  source of the ambiguity.  blurs = it was helping to resolve the question.",
+        f"  entropy noise floor {floor:.3f}: the baseline's own entropy wanders this much",
+        "  between identical calls, so smaller shifts are not reported. Only shifts both",
+        "  perturbation modes agree on, in direction and size, are counted.",
         "",
     ]
-    shown = [r for r in scored if abs(min(e.entropy_delta for e in r.effects.values() if e.ok)) > 0]
-    if not shown:
-        out.append("  No segment changed the shape of the distribution measurably.")
+    scored: list[tuple[float, Row]] = []
+    for row in report.content_rows:
+        shift = agreed_entropy_shift(row)
+        if shift is not None and abs(shift) > floor:
+            scored.append((shift, row))
+    if not scored:
+        out.append("  No segment shifted the entropy further than the baseline shifts on")
+        out.append("  its own. The ambiguity is spread across this document rather than")
+        out.append("  located in any one section.")
         return out
-    for row in shown[:8]:
-        d = min(e.entropy_delta for e in row.effects.values() if e.ok)
-        sign = "↓ sharpens" if d < 0 else "↑ blurs   "
-        out.append(f"      {_trim(row.segment.label, 42):<42} {sign} {abs(d):+.3f}")
+    for shift, row in sorted(scored, key=lambda pair: abs(pair[0]), reverse=True)[:10]:
+        label = "sharpens" if shift < 0 else "blurs   "
+        out.append(
+            f"      {_trim(row.segment.label, 40):<40} {label} {shift:+.3f}"
+            f"  {_bar(abs(shift), 1.0, 12)}"
+        )
     return out
 
 

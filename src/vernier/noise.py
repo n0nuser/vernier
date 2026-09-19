@@ -63,6 +63,13 @@ class NoiseFloor:
     quantization: float
     value: float
     saturated: bool
+    entropy_spread: float = 0.0
+    """How much the baseline's own entropy wanders between identical calls.
+
+    ``haze`` reads entropy rather than distance, so it needs its own floor.
+    Without one, a document whose reading drifts by a tenth of a bit between
+    calls would appear to have a tenth of a bit of ambiguity in every section.
+    """
 
     @property
     def at_resolution_limit(self) -> bool:
@@ -104,6 +111,7 @@ def measure_noise_floor(replicates: Sequence[Reading], metric: str) -> NoiseFloo
     observed = max(spreads) if spreads else 0.0
     support = max(len(r.support) for r in replicates)
     quantization = resolution_limit(support, metric)
+    entropies = [normalised_entropy(r.distribution) for r in replicates]
     return NoiseFloor(
         metric=metric,
         replicates=tuple(replicates),
@@ -113,6 +121,7 @@ def measure_noise_floor(replicates: Sequence[Reading], metric: str) -> NoiseFloo
         # Never zero: the grid alone can manufacture a difference this large.
         value=max(observed, quantization),
         saturated=any(r.is_one_hot for r in replicates),
+        entropy_spread=max(entropies) - min(entropies),
     )
 
 
