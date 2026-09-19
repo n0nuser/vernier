@@ -24,7 +24,14 @@ from vernier_scale.noise import (
 )
 from vernier_scale.perturb import inject_placebos, render
 from vernier_scale.segment import segment as split
-from vernier_scale.types import BaselineTag, Mode, Question, Reading, Segment, SegmentKind, TrialTag
+from vernier_scale.types import (
+    BaselineTag,
+    Mode,
+    Question,
+    Reading,
+    Segment,
+    TrialTag,
+)
 
 QUESTION_ID = "verdict"
 

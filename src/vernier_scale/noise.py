@@ -22,7 +22,6 @@ from typing import Mapping, Sequence
 
 from vernier_scale.distance import (
     cross,
-    distance,
     jsd,
     normalised_entropy,
     pairwise,
