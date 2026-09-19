@@ -155,7 +155,7 @@ def _readings(outcomes: Sequence[Outcome]) -> tuple[list[Reading], list[str]]:
     return good, errors
 
 
-def run_ablate(
+def ablate(
     text: str,
     question: Question,
     client: JevClient,

@@ -11,7 +11,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Sequence
+from typing import Mapping, Sequence
 
 from vernier.client import (
     DEFAULT_MODEL,
@@ -21,8 +21,10 @@ from vernier.client import (
     StubJevClient,
 )
 from vernier.report import render_deadweight, render_haze, render_json, render_text
+from vernier import questions
 from vernier.errors import VernierError
-from vernier.run import Config, Report, run_ablate
+from vernier.questions import QuestionError
+from vernier.run import Config, Report, ablate
 from vernier.segment import SEGMENTERS
 from vernier.types import Mode, Question
 
@@ -37,49 +39,53 @@ class UsageError(Exception):
 
 
 def build_question(args: argparse.Namespace) -> Question:
-    """Assemble the question from flags or a JSON spec."""
+    """Assemble the question from flags or a JSON spec.
+
+    Raises:
+        UsageError: If the flags do not describe exactly one well-formed question.
+    """
+    try:
+        return _question_from(args)
+    except QuestionError as exc:
+        raise UsageError(str(exc)) from exc
+
+
+def _question_from(args: argparse.Namespace) -> Question:
     if args.question_file:
-        try:
-            spec = json.loads(Path(args.question_file).read_text(encoding="utf-8"))
-        except OSError as exc:
-            raise UsageError(f"cannot read {args.question_file}: {exc}") from exc
-        except json.JSONDecodeError as exc:
-            raise UsageError(f"{args.question_file} is not valid JSON: {exc}") from exc
-        if not isinstance(spec, dict) or "type" not in spec or "instructions" not in spec:
-            raise UsageError("question file needs at least 'type' and 'instructions'")
-        criteria = spec.get("criteria")
-        return Question(
-            type=spec["type"],
-            instructions=spec["instructions"],
-            criteria=tuple(criteria) if isinstance(criteria, list) else criteria,
-        )
+        return questions.from_mapping(_load_spec(args.question_file))
 
     given = [bool(args.noul), bool(args.choice), bool(args.score)]
     if sum(given) != 1:
         raise UsageError("give exactly one of --noul, --choice, --score, or --question-file")
 
     if args.noul:
-        criteria = {}
-        if args.true:
-            criteria["true"] = args.true
-        if args.false:
-            criteria["false"] = args.false
-        return Question("noul", args.noul, criteria or None)
-
+        return questions.noul(args.noul, true=args.true, false=args.false)
     if args.choice:
-        if len(args.option) < 2:
-            raise UsageError("--choice needs at least two --option values")
-        options: dict[str, str | None] = {}
-        for raw in args.option:
-            name, _, desc = raw.partition("=")
-            if name in options:
-                raise UsageError(f"duplicate option {name!r}")
-            options[name] = desc or None
-        return Question("choice", args.choice, options)
+        return questions.choice(args.choice, _options(args.option))
+    return questions.score(args.score, args.level)
 
-    if len(args.level) < 2:
-        raise UsageError("--score needs at least two --level values, lowest first")
-    return Question("score", args.score, tuple(args.level))
+
+def _load_spec(path: str) -> Mapping[str, object]:
+    try:
+        spec = json.loads(Path(path).read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise UsageError(f"cannot read {path}: {exc}") from exc
+    except json.JSONDecodeError as exc:
+        raise UsageError(f"{path} is not valid JSON: {exc}") from exc
+    if not isinstance(spec, dict):
+        raise UsageError(f"{path} must hold a JSON object describing one question")
+    return spec
+
+
+def _options(raw: Sequence[str]) -> dict[str, str | None]:
+    """Parse repeated --option NAME[=DESCRIPTION] flags."""
+    parsed: dict[str, str | None] = {}
+    for item in raw:
+        name, _, description = item.partition("=")
+        if name in parsed:
+            raise UsageError(f"duplicate option {name!r}")
+        parsed[name] = description or None
+    return parsed
 
 
 def build_client(args: argparse.Namespace) -> JevClient:
@@ -128,7 +134,7 @@ def execute(args: argparse.Namespace) -> Report:
     text, source = load_document(args.document)
     if not text.strip():
         raise UsageError("the document is empty")
-    return run_ablate(
+    return ablate(
         text, build_question(args), build_client(args), build_config(args), source=source
     )
 
