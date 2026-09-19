@@ -10,7 +10,7 @@ from __future__ import annotations
 import math
 from typing import Mapping, Sequence
 
-from vernier.types import HALF_QUANTUM, Reading
+from vernier_scale.types import HALF_QUANTUM, Reading
 
 
 def _normalise(p: Mapping[str, float]) -> dict[str, float]:

@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-import vernier
+import vernier_scale as vernier
 
 RULEBOOK = Path(__file__).resolve().parents[1] / "examples" / "contributor-covenant-2.1.md"
 SIGNAL = "A permanent ban from any sort of public interaction within the community."
@@ -44,7 +44,7 @@ def test_no_private_name_is_exported() -> None:
 
 def test_version_matches_the_installed_package_metadata() -> None:
     """The distribution metadata is the single source of truth for the version."""
-    assert vernier.__version__ == importlib.metadata.version("vernier")
+    assert vernier.__version__ == importlib.metadata.version("vernier-scale")
     assert vernier.__version__[0].isdigit()
 
 
@@ -55,7 +55,7 @@ def test_an_unknown_attribute_raises() -> None:
 
 
 def test_every_cli_error_is_catchable_as_a_vernier_error() -> None:
-    from vernier.cli import UsageError
+    from vernier_scale.cli import UsageError
 
     assert issubclass(UsageError, vernier.VernierError)
 
@@ -78,7 +78,7 @@ def test_importing_the_package_reads_nothing_and_calls_nothing(
 
 def test_every_submodule_imports_cleanly() -> None:
     for info in pkgutil.iter_modules([str(Path(vernier.__file__).parent)]):
-        importlib.import_module(f"vernier.{info.name}")
+        importlib.import_module(f"vernier_scale.{info.name}")
 
 
 def test_a_missing_key_fails_at_construction_not_at_call_time(

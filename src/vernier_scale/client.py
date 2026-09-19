@@ -19,8 +19,8 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import Mapping, Protocol, Sequence
 
-from vernier.errors import VernierError
-from vernier.types import BaselineTag, Question, QuestionType, Reading, TrialTag
+from vernier_scale.errors import VernierError
+from vernier_scale.types import BaselineTag, Question, QuestionType, Reading, TrialTag
 
 DEFAULT_BASE_URL = "https://api.typesafe.ai"
 DEFAULT_MODEL = "jev-latest"
@@ -214,7 +214,7 @@ class HttpJevClient:
                 headers={
                     "Authorization": f"Bearer {self.api_key}",
                     "Content-Type": "application/json",
-                    "User-Agent": "vernier/0.1",
+                    "User-Agent": "vernier-scale/0.1",
                 },
                 method="POST",
             )

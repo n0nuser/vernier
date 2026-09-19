@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from typing import Mapping, Sequence
 
-from vernier.errors import VernierError
-from vernier.types import Question
+from vernier_scale.errors import VernierError
+from vernier_scale.types import Question
 
 
 class QuestionError(VernierError, ValueError):

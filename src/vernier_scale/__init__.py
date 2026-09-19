@@ -7,7 +7,7 @@ distribution moved — against a noise floor established from repeated calls on
 the unmodified text, so that a movement smaller than the model's own jitter is
 never reported as a finding.
 
-    import vernier
+    import vernier_scale as vernier
 
     report = vernier.ablate(
         text=open("policy.md").read(),
@@ -30,7 +30,7 @@ from __future__ import annotations
 
 from importlib.metadata import PackageNotFoundError, version
 
-from vernier.client import (
+from vernier_scale.client import (
     Call,
     ConfigurationError,
     HttpJevClient,
@@ -40,14 +40,14 @@ from vernier.client import (
     StubJevClient,
     run_calls,
 )
-from vernier.distance import entropy, jsd, normalised_entropy, resolution_limit, tvd
-from vernier.errors import VernierError
-from vernier.noise import Effect, NoiseFloor, Verdict
-from vernier.questions import QuestionError, choice, from_mapping, noul, score
-from vernier.report import render_deadweight, render_haze, render_json, render_text
-from vernier.run import Config, Report, Row, Validity, ablate, baseline_haze
-from vernier.segment import SEGMENTERS, Segmenter, TilingError, segment
-from vernier.types import Mode, Question, Reading, Segment, SegmentKind
+from vernier_scale.distance import entropy, jsd, normalised_entropy, resolution_limit, tvd
+from vernier_scale.errors import VernierError
+from vernier_scale.noise import Effect, NoiseFloor, Verdict
+from vernier_scale.questions import QuestionError, choice, from_mapping, noul, score
+from vernier_scale.report import render_deadweight, render_haze, render_json, render_text
+from vernier_scale.run import Config, Report, Row, Validity, ablate, baseline_haze
+from vernier_scale.segment import SEGMENTERS, Segmenter, TilingError, segment
+from vernier_scale.types import Mode, Question, Reading, Segment, SegmentKind
 
 # Read eagerly, and deliberately. PEP 562 would defer this one filesystem
 # lookup, but a module-level __getattr__ types every unknown attribute as
@@ -56,7 +56,7 @@ from vernier.types import Mode, Question, Reading, Segment, SegmentKind
 # more than a millisecond, and reading our own installed metadata is not the
 # kind of import-time side effect the rest of this package avoids.
 try:
-    __version__ = version("vernier")
+    __version__ = version("vernier-scale")
 except PackageNotFoundError:  # a source tree that was never installed
     __version__ = "0.0.0.dev0"
 

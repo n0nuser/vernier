@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from vernier.segment import SEGMENTERS, TilingError, segment, verify_tiling
-from vernier.types import Segment
+from vernier_scale.segment import SEGMENTERS, TilingError, segment, verify_tiling
+from vernier_scale.types import Segment
 
 RULEBOOK = Path(__file__).resolve().parents[1] / "examples" / "contributor-covenant-2.1.md"
 

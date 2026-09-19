@@ -5,10 +5,10 @@ from __future__ import annotations
 import json
 from typing import Iterable, Sequence
 
-from vernier.distance import normalised_entropy
-from vernier.noise import ALPHA, Effect, Verdict
-from vernier.run import Report, Row, agreed_entropy_shift, baseline_haze
-from vernier.types import Reading
+from vernier_scale.distance import normalised_entropy
+from vernier_scale.noise import ALPHA, Effect, Verdict
+from vernier_scale.run import Report, Row, agreed_entropy_shift, baseline_haze
+from vernier_scale.types import Reading
 
 BAR = "█"
 RULE = "─"

@@ -10,9 +10,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Mapping, Sequence
 
-from vernier.client import Call, JevClient, Outcome, run_calls
-from vernier.distance import normalised_entropy, primary_metric
-from vernier.noise import (
+from vernier_scale.client import Call, JevClient, Outcome, run_calls
+from vernier_scale.distance import normalised_entropy, primary_metric
+from vernier_scale.noise import (
     Effect,
     NoiseFloor,
     Verdict,
@@ -22,9 +22,9 @@ from vernier.noise import (
     measure_noise_floor,
     rank_key,
 )
-from vernier.perturb import inject_placebos, render
-from vernier.segment import segment as split
-from vernier.types import BaselineTag, Mode, Question, Reading, Segment, SegmentKind, TrialTag
+from vernier_scale.perturb import inject_placebos, render
+from vernier_scale.segment import segment as split
+from vernier_scale.types import BaselineTag, Mode, Question, Reading, Segment, SegmentKind, TrialTag
 
 QUESTION_ID = "verdict"
 

@@ -12,8 +12,8 @@ from __future__ import annotations
 import re
 from typing import Callable, Sequence
 
-from vernier.errors import VernierError
-from vernier.types import Segment, SegmentKind
+from vernier_scale.errors import VernierError
+from vernier_scale.types import Segment, SegmentKind
 
 Segmenter = Callable[[str], list[Segment]]
 

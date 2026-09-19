@@ -6,7 +6,7 @@ import math
 
 import pytest
 
-from vernier.distance import (
+from vernier_scale.distance import (
     entropy,
     jsd,
     normalised_entropy,
@@ -14,7 +14,7 @@ from vernier.distance import (
     resolution_limit,
     tvd,
 )
-from vernier.types import HALF_QUANTUM, Reading
+from vernier_scale.types import HALF_QUANTUM, Reading
 
 
 def noul(p: float) -> Reading:

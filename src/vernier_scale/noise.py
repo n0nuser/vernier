@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Mapping, Sequence
 
-from vernier.distance import (
+from vernier_scale.distance import (
     cross,
     distance,
     jsd,
@@ -29,7 +29,7 @@ from vernier.distance import (
     resolution_limit,
     tvd,
 )
-from vernier.types import Reading
+from vernier_scale.types import Reading
 
 ALPHA = 0.05
 """Significance level for the permutation test."""

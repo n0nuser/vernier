@@ -6,11 +6,11 @@ from pathlib import Path
 
 import pytest
 
-from vernier.client import Call, JevClient, Outcome, StubJevClient
-from vernier.noise import Verdict
-from vernier.report import render_deadweight, render_haze, render_json, render_text
-from vernier.run import Config, ablate
-from vernier.types import Mode, Question, SegmentKind
+from vernier_scale.client import Call, JevClient, Outcome, StubJevClient
+from vernier_scale.noise import Verdict
+from vernier_scale.report import render_deadweight, render_haze, render_json, render_text
+from vernier_scale.run import Config, ablate
+from vernier_scale.types import Mode, Question, SegmentKind
 
 RULEBOOK = Path(__file__).resolve().parents[1] / "examples" / "contributor-covenant-2.1.md"
 DOC = RULEBOOK.read_text(encoding="utf-8")

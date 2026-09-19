@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import re
 
-from vernier.filler import filler_words, match_length, neutral_heading
-from vernier.perturb import inject_placebos, render
-from vernier.segment import segment, verify_tiling
-from vernier.types import Mode, SegmentKind
+from vernier_scale.filler import filler_words, match_length, neutral_heading
+from vernier_scale.perturb import inject_placebos, render
+from vernier_scale.segment import segment, verify_tiling
+from vernier_scale.types import Mode, SegmentKind
 
 DOC = (
     "# Handbook\n\n"

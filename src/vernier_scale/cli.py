@@ -13,20 +13,20 @@ import sys
 from pathlib import Path
 from typing import Mapping, Sequence
 
-from vernier.client import (
+from vernier_scale.client import (
     DEFAULT_MODEL,
     ConfigurationError,
     HttpJevClient,
     JevClient,
     StubJevClient,
 )
-from vernier.report import render_deadweight, render_haze, render_json, render_text
-from vernier import questions
-from vernier.errors import VernierError
-from vernier.questions import QuestionError
-from vernier.run import Config, Report, ablate
-from vernier.segment import SEGMENTERS
-from vernier.types import Mode, Question
+from vernier_scale.report import render_deadweight, render_haze, render_json, render_text
+from vernier_scale import questions
+from vernier_scale.errors import VernierError
+from vernier_scale.questions import QuestionError
+from vernier_scale.run import Config, Report, ablate
+from vernier_scale.segment import SEGMENTERS
+from vernier_scale.types import Mode, Question
 
 EXIT_OK = 0
 EXIT_INVALID = 1

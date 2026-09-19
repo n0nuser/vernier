@@ -49,10 +49,14 @@ moves the number, `vernier` prints no ranking at all.
 ## Install
 
 ```sh
-uv add vernier          # as a library
-uv tool install vernier # as a command
+uv add vernier-scale          # as a library
+uv tool install vernier-scale # as a command, installed as `vernier`
 export TYPESAFE_API_KEY=...   # from console.typesafe.ai/keys
 ```
+
+The PyPI name is `vernier-scale` — a vernier scale being the instrument this is
+named after — because `vernier` was already taken. It imports as
+`vernier_scale` and its command is `vernier`.
 
 ## As a library
 
@@ -61,7 +65,7 @@ importable, and nothing is read from the environment, logged or printed unless
 you ask for it — the client is passed in, and rendering is a separate step.
 
 ```python
-import vernier
+import vernier_scale as vernier
 
 report = vernier.ablate(
     text=open("policy.md").read(),

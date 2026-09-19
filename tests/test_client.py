@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from vernier.client import (
+from vernier_scale.client import (
     Call,
     JevError,
     Outcome,
@@ -12,7 +12,7 @@ from vernier.client import (
     reading_from_answer,
     run_calls,
 )
-from vernier.types import BaselineTag, Question
+from vernier_scale.types import BaselineTag, Question
 
 Q = {"verdict": Question("noul", "does it?")}
 

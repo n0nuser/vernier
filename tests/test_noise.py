@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from vernier.noise import (
+from vernier_scale.noise import (
     ALPHA,
     Verdict,
     classify,
@@ -15,7 +15,7 @@ from vernier.noise import (
     permutation_p,
     rank_key,
 )
-from vernier.types import Reading
+from vernier_scale.types import Reading
 
 
 def noul(p: float) -> Reading:

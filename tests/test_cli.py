@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from vernier.cli import EXIT_INVALID, EXIT_OK, EXIT_USAGE, build_parser, build_question, main
+from vernier_scale.cli import EXIT_INVALID, EXIT_OK, EXIT_USAGE, build_parser, build_question, main
 
 RULEBOOK = str(Path(__file__).resolve().parents[1] / "examples" / "contributor-covenant-2.1.md")
 SIGNAL = "A permanent ban from any sort of public interaction"
