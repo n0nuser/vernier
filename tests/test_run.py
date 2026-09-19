@@ -217,6 +217,14 @@ def test_every_renderer_produces_output_for_the_same_run() -> None:
         assert "NOISE FLOOR" in text
 
 
+def test_every_view_names_an_unmeasured_segment_exactly_once() -> None:
+    client = instrument(fail_on=("### 4. General Notes",))
+    report = ablate(DOC, QUESTION, client, FAST)
+    assert report.unmeasured
+    for render in (render_text, render_deadweight):
+        assert render(report).count("UNMEASURED") == 1
+
+
 def test_deadweight_names_the_inert_sections() -> None:
     report = ablate(DOC, QUESTION, instrument(), FAST)
     out = render_deadweight(report)

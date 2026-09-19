@@ -344,7 +344,8 @@ def render_deadweight(report: Report) -> str:
             out.append(
                 "  be jitter, and is still smaller than this run can call meaningful."
             )
-    out.extend(_failed_block(report))
+    # render_text already placed the unmeasured block; adding it again here
+    # would print the whole section twice.
     undecided = report.indeterminate
     if undecided:
         out.append("")

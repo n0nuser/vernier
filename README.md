@@ -120,34 +120,45 @@ vernier ablate examples/contributor-covenant-2.1.md \
 
 ```
 BASELINE  (unmodified document, one call each)
-  [0] p=0.82   [1] p=0.80   [2] p=0.82   [3] p=0.81
-  [4] p=0.80   [5] p=0.82   [6] p=0.81   [7] p=0.82
+  [0] p=0.82   [1] p=0.80   [2] p=0.82   [3] p=0.79
+  [4] p=0.81   [5] p=0.81   [6] p=0.81   [7] p=0.80
+  entropy    0.706 of maximum
 
 NOISE FLOOR  (spread across identical calls; nothing below it is a finding)
-  measured spread   0.0200 tvd   over 28 pairs
+  measured spread   0.0300 tvd   over 28 pairs
   resolution limit  0.0100   (probabilities arrive rounded to 2dp)
-  floor             0.0200   limited by run-to-run spread
-  threshold         0.0300   floor + one resolution step
+  floor             0.0300   limited by run-to-run spread
+  threshold         0.0400   floor + one resolution step
+  entropy spread    0.0614   the floor haze is read against
 
 CONTROL   (neutral segments that must land inside the noise)
-  [pass] ## Building Access         delete=0.0058 p=0.359  mask=0.0108 p=0.134
-  [pass] ## Facilities Housekeeping delete=0.0158 p=0.005  mask=0.0025 p=0.800
+  [pass] ## Building Access         delete=0.0008 p=1.000  mask=0.0075 p=0.257
+  [pass] ## Facilities Housekeeping delete=0.0242 p=0.001  mask=0.0125 p=0.036
   [pass] segmentation tiles the document byte-exactly (null ablation)
 
-ATTRIBUTION  (4 of 12 segments cleared 0.0300 at p≤0.05)
+ATTRIBUTION  (4 of 12 segments cleared 0.0400 at p≤0.05)
+  ++ corroborated by both modes   ~ mode-sensitive (deletion confound suspected)
+  size = distance between mean baseline and mean perturbed distribution
+  p    = exact permutation test: could this run's jitter alone do it?
+
  ++ ### 4. Permanent Ban
-      delete  0.2042  p=0.000  ↓0.20  ██████████████████
-      mask    0.1908  p=0.000  ↓0.19  █████████████████·
+      delete  0.1892  p=0.000  ↓0.19  H+0.253  █████████████████·
+      mask    0.2008  p=0.000  ↓0.20  H+0.260  ██████████████████
  ++ ### 3. Temporary Ban
-      delete  0.0708  p=0.000  ↑0.07  ██████············
-      mask    0.0692  p=0.000  ↑0.07  ██████············
- ++ ### 1. Correction
-      delete  0.0342  p=0.000  ↑0.03  ███···············
-      mask    0.0375  p=0.000  ↑0.04  ███···············
+      delete  0.0725  p=0.000  ↑0.07  H-0.177  ██████············
+      mask    0.0758  p=0.000  ↑0.08  H-0.187  ███████···········
+ ~  ### 1. Correction
+      delete  0.0308  p=0.000  ↑0.03  H-0.068  ███···············
+      mask    0.0442  p=0.000  ↑0.04  H-0.101  ████··············
  ~  ### 2. Warning
-      delete  0.0558  p=0.000  ↑0.06  █████·············
-      mask    0.0192  p=0.002  ↑0.02  ██················
+      delete  0.0608  p=0.000  ↑0.06  H-0.144  █████·············
+      mask    0.0208  p=0.013  ↑0.02  H-0.046  ██················
 ```
+
+`size` is how far the mean distribution moved, `p` is the permutation test,
+the arrow is the signed shift on the leading outcome, and `H` is the change in
+entropy. On a Choice or Score run each row also carries `conf`, the change in
+Jev's own confidence.
 
 Read the arrows. Removing **Permanent Ban** takes the verdict *down* by 0.20 —
 that section is what the verdict rests on. Removing any of the three milder
@@ -164,6 +175,11 @@ nothing to say about *which rung*, and the measurement shows that.
 as masking it does. That is the deletion confound made visible, and it is
 reported rather than ranked as if it were solid.
 
+The `H` column reads the same story a second way. Removing **Permanent Ban**
+raises the entropy — take the top rung away and the question becomes harder to
+settle. Removing any of the milder rungs *lowers* it, because there is one less
+competing answer.
+
 ## The other two readings
 
 `deadweight` is the same run inverted — the segments the verdict does not rest
@@ -175,19 +191,39 @@ off-platform conduct falls within the Code of Conduct's scope, Jev answers
 flat:
 
 ```
-HAZE  0.850   █████████████████████████·····
-  Jev's own confidence: 0.43.
+BASELINE  (unmodified document, one call each)
+  [0] out_of_scope [in_scope=0.28, out_of_scope=0.72] conf=0.44
+  [1] out_of_scope [in_scope=0.31, out_of_scope=0.69] conf=0.38
+  [2] out_of_scope [in_scope=0.22, out_of_scope=0.78] conf=0.55
+  ... 10 calls, every one answering out_of_scope
+  entropy    0.860 of maximum
+
+HAZE  0.860   ██████████████████████████····
+
+  The distribution is close to flat. With well-formed options that is a fact
+  about the input, not the model: this document does not decide the question.
+  Jev's own confidence: 0.44.
 
 WHERE THE AMBIGUITY LIVES  (change in entropy when a segment is removed)
-      ### 2. Warning                           sharpens -0.085
-      ## Enforcement Responsibilities          sharpens -0.072
+  entropy noise floor 0.144: the baseline's own entropy wanders this much
+  between identical calls, so smaller shifts are not reported.
+
+  No segment shifted the entropy further than the baseline shifts on
+  its own. The ambiguity is spread across this document rather than
+  located in any one section.
 ```
 
-The answer looks decisive and is not. `## Enforcement Responsibilities` lets
-leaders act on anything they "deem inappropriate", which pulls against the
-narrow `## Scope` section — and removing it measurably settles the question.
-Given well-formed options, a flat distribution is a fact about the *input*, not
-the model: the document does not decide this.
+The answer looks decisive and is not: ten calls, ten identical verdicts, and a
+distribution that is 86% of the way to flat. Anything reading only
+`answer.choice` would ship that as settled.
+
+Note what the tool then declines to do. Its first instinct is to name the
+sections responsible, but the baseline's own entropy wanders by 0.144 between
+identical calls — normalised entropy is steep near p=0.3, so the ordinary
+jitter in the probability is amplified in the entropy — and no segment shifted
+it further than that. So it reports nothing, and says why. An earlier run at
+fewer replicates did name two sections; they did not survive the floor at
+higher power, which is exactly the outcome the floor exists to produce.
 
 ## Verdicts
 
