@@ -1,0 +1,8 @@
+{
+  "type": "noul",
+  "instructions": "A contributor has, over several months and after a prior written warning, repeatedly made derogatory remarks about contributors of a particular nationality. Under this Code of Conduct, is a permanent ban the proportionate consequence?",
+  "criteria": {
+    "true": "The Code of Conduct, as written here, supports a permanent ban for this conduct",
+    "false": "The Code of Conduct, as written here, does not support a permanent ban for this conduct"
+  }
+}
