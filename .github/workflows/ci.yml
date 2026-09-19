@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10
+        with:
+          enable-cache: true
+
+      - name: Run the suite
+        run: uv run --python ${{ matrix.python }} --frozen pytest -q
+
+      - name: Type-check
+        run: uv run --python ${{ matrix.python }} --frozen mypy
+
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10
+
+      - name: Build
+        run: uv build
+
+      # A package that imports only from its own source tree is not a package.
+      # Installing the wheel into a clean environment is what proves py.typed
+      # ships, the console script is wired, and nothing was left untracked.
+      - name: Install the wheel into a clean environment and use it
+        run: |
+          uv venv /tmp/clean
+          uv pip install --python /tmp/clean/bin/python dist/*.whl
+          /tmp/clean/bin/python - <<'PY'
+          import pathlib
+          import vernier_scale as vernier
+
+          report = vernier.ablate(
+              "# A\n\nalpha rule here\n\n## B\n\nbeta text here\n",
+              vernier.noul("is it?"),
+              vernier.StubJevClient(),
+              vernier.Config(concurrency=4),
+          )
+          assert report.calls > 0, report
+          assert (pathlib.Path(vernier.__file__).parent / "py.typed").is_file(), "py.typed missing"
+          print("wheel ok:", vernier.__version__, "|", len(vernier.__all__), "exports")
+          PY
+          /tmp/clean/bin/vernier --help > /dev/null
+
+      - name: Check the metadata renders on PyPI
+        run: uvx twine check dist/*

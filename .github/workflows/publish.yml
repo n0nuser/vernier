@@ -1,0 +1,119 @@
+name: Publish
+
+# Tagging is the release. Push v0.2.0 and that is what lands on PyPI:
+# the tag is the single source of the version, so the tag and the
+# published artifact cannot disagree.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish, without the leading v (e.g. 0.2.0)"
+        required: true
+        type: string
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10
+        with:
+          enable-cache: true
+
+      - run: uv run --python ${{ matrix.python }} --frozen pytest -q
+      - run: uv run --python ${{ matrix.python }} --frozen mypy
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10
+
+      - name: Work out the version being published
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            version='${{ inputs.version }}'
+          else
+            version="${GITHUB_REF_NAME#v}"
+          fi
+          # PEP 440 release segment, with the usual pre/post/dev suffixes.
+          if ! printf '%s' "$version" \
+            | grep -Eq '^[0-9]+(\.[0-9]+)*((a|b|rc)[0-9]+)?(\.post[0-9]+)?(\.dev[0-9]+)?$'; then
+            echo "::error::'$version' is not a PEP 440 version"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "publishing $version"
+
+      - name: Set the version in pyproject.toml to match the tag
+        run: |
+          current=$(uv version --short)
+          target='${{ steps.version.outputs.version }}'
+          if [ "$current" = "$target" ]; then
+            echo "pyproject.toml already at $target, nothing to change"
+          else
+            echo "pyproject.toml is at $current, setting it to $target"
+            uv version "$target"
+          fi
+
+      - name: Build
+        run: uv build
+
+      # The tag said one thing and the metadata must say the same. Without
+      # this a mis-set version ships silently and can never be replaced,
+      # because PyPI does not allow a version number to be reused.
+      - name: Check the artifacts carry that exact version
+        run: |
+          target='${{ steps.version.outputs.version }}'
+          ls -1 dist/
+          test -f "dist/vernier_scale-${target}-py3-none-any.whl" \
+            || { echo "::error::wheel for ${target} not found"; exit 1; }
+          test -f "dist/vernier_scale-${target}.tar.gz" \
+            || { echo "::error::sdist for ${target} not found"; exit 1; }
+          uvx twine check dist/*
+
+      - name: Refuse to republish a version PyPI already has
+        run: |
+          target='${{ steps.version.outputs.version }}'
+          code=$(curl -s -o /dev/null -w '%{http_code}' \
+            "https://pypi.org/pypi/vernier-scale/${target}/json")
+          if [ "$code" = "200" ]; then
+            echo "::error::vernier-scale ${target} is already on PyPI and cannot be replaced"
+            exit 1
+          fi
+          echo "${target} is free (HTTP ${code})"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/vernier-scale/${{ needs.build.outputs.version }}/
+    permissions:
+      # Trusted Publishing: PyPI verifies this workflow's OIDC identity.
+      # There is no token to leak, rotate, or accidentally commit.
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+
+      - uses: pypa/gh-action-pypi-publish@release/v1

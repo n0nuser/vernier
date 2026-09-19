@@ -303,6 +303,23 @@ uv run pytest      # no network, no key
 uv run mypy
 ```
 
+## Releasing
+
+The tag is the release. Pushing `v0.2.0` runs the suite on 3.12 and 3.13,
+sets the version in `pyproject.toml` to match the tag, builds, and publishes to
+PyPI through Trusted Publishing — no API token exists anywhere in the repo or
+its secrets.
+
+```sh
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+Before uploading, the workflow refuses to continue if the built artifacts do not
+carry exactly that version, or if PyPI already has it. A PyPI version can never
+be reused, so both checks have to happen before the upload rather than after.
+
+`workflow_dispatch` takes a version directly, for a re-run without moving a tag.
+
 The suite runs entirely against `StubJevClient`, which reproduces the three
 quirks the statistics have to survive: answers on a two-decimal grid, identical
 calls that differ slightly, and distributions that can saturate at 1.0.
