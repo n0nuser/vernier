@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import importlib.metadata
 import pkgutil
 from pathlib import Path
 
@@ -41,9 +42,22 @@ def test_no_private_name_is_exported() -> None:
     assert not [n for n in public if n.startswith("_")]
 
 
-def test_version_is_exposed() -> None:
-    assert vernier.__version__
+def test_version_matches_the_installed_package_metadata() -> None:
+    """The distribution metadata is the single source of truth for the version."""
+    assert vernier.__version__ == importlib.metadata.version("vernier")
     assert vernier.__version__[0].isdigit()
+
+
+def test_an_unknown_attribute_raises() -> None:
+    """Nothing widens the module namespace, so a consumer's typo is caught."""
+    with pytest.raises(AttributeError):
+        getattr(vernier, "definitely_not_exported")
+
+
+def test_every_cli_error_is_catchable_as_a_vernier_error() -> None:
+    from vernier.cli import UsageError
+
+    assert issubclass(UsageError, vernier.VernierError)
 
 
 def test_the_package_is_marked_typed() -> None:

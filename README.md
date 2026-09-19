@@ -49,9 +49,58 @@ moves the number, `vernier` prints no ranking at all.
 ## Install
 
 ```sh
-uv sync
+uv add vernier          # as a library
+uv tool install vernier # as a command
 export TYPESAFE_API_KEY=...   # from console.typesafe.ai/keys
 ```
+
+## As a library
+
+The CLI is a thin adapter over the same measurement. Everything it does is
+importable, and nothing is read from the environment, logged or printed unless
+you ask for it — the client is passed in, and rendering is a separate step.
+
+```python
+import vernier
+
+report = vernier.ablate(
+    text=open("policy.md").read(),
+    question=vernier.noul("Does this policy permit a refund here?"),
+    client=vernier.HttpJevClient.from_environment(),
+)
+
+if not report.validity.ok:
+    raise SystemExit(report.validity.reasons[0])   # a control moved; do not trust a ranking
+
+for row in report.ranked:
+    print(f"{row.strength:.4f}  {row.verdict.value:14}  {row.segment.label}")
+```
+
+`noul`, `choice` and `score` build the three question types, mirroring
+TypeSafe's own SDKs. `Report` carries `ranked`, `inside_noise`, `indeterminate`
+and `unmeasured`, plus the `floor` every one of them was judged against.
+
+Swap the client to run the whole pipeline with no network and no key — this is
+how vernier's own test suite runs:
+
+```python
+report = vernier.ablate(text, question, vernier.StubJevClient(base=0.8))
+```
+
+Any object with an `evaluate(Call) -> Outcome` method satisfies `JevClient`, so
+a recorded fixture, a cache or a different model drops straight in.
+
+The statistics and the segmenters are usable on their own:
+
+```python
+vernier.segment(text, "section")          # also paragraph, sentence, line, item
+vernier.tvd(before, after)                # and jsd, entropy, normalised_entropy
+vernier.resolution_limit(3, "jsd")        # the floor 2dp rounding alone imposes
+```
+
+Errors all descend from `vernier.VernierError`, so one `except` covers the
+library and nothing else. The package ships `py.typed`; a strict `mypy` run
+against the public surface passes.
 
 ## A real measurement
 
@@ -193,6 +242,8 @@ failed call becomes a marked failure rather than a convenient zero.
 
 | module | |
 |---|---|
+| `__init__.py` | the public surface: a re-export facade, nothing else |
+| `questions.py` | `noul` / `choice` / `score` constructors |
 | `segment.py` | pluggable segmenters; every one tiles the document byte-exactly |
 | `perturb.py` | delete and mask, plus placebo injection |
 | `filler.py` | the neutral corpus both of those draw on |
@@ -201,6 +252,8 @@ failed call becomes a marked failure rather than a convenient zero.
 | `noise.py` | the noise floor, the permutation test, and the verdicts |
 | `run.py` | orchestration: baseline, preflight, fan-out, assembly |
 | `report.py` | rendering |
+| `errors.py` | `VernierError`, the base every other error inherits |
+| `cli.py` | argument parsing and exit codes; no measurement logic |
 
 ```sh
 uv run pytest      # no network, no key

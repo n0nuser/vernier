@@ -34,8 +34,12 @@ EXIT_USAGE = 2
 EXIT_ERROR = 3
 
 
-class UsageError(Exception):
-    pass
+class UsageError(VernierError):
+    """The command line was given something it cannot act on.
+
+    Caught before the general VernierError handler so it exits with the usage
+    code rather than the error code.
+    """
 
 
 def build_question(args: argparse.Namespace) -> Question:

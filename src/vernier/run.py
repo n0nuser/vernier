@@ -162,77 +162,151 @@ def ablate(
     config: Config = Config(),
     source: str = "<text>",
 ) -> Report:
-    """Measure every segment's contribution to one question's answer."""
+    """Measure every segment's contribution to one question's answer.
+
+    The baseline and its noise floor are established first. If the baseline
+    turns out to have no headroom, the run stops there rather than spending
+    hundreds of requests measuring into a wall.
+
+    Args:
+        text: The document to measure.
+        question: The question to ask of it, unchanged across every call.
+        client: Where to send the calls. Pass a stub to run without a network.
+        config: Segmentation, perturbation modes and replicate counts.
+        source: What to call the document in the report.
+    """
     segments = prepare(text, config)
     questions = {QUESTION_ID: question}
     metric = primary_metric(question.type)
-    baseline_state = render(segments)
 
-    # --- baseline and noise floor, before anything else is spent ------------
-    base_calls = [
-        Call(baseline_state, questions, BaselineTag(i))
-        for i in range(config.baseline_replicates)
-    ]
-    base_out = run_calls(client, base_calls, config.concurrency)
-    baseline, base_errors = _readings(base_out)
-    usage = _usage_of(base_out)
+    baseline, base_errors, base_calls, usage = _measure_baseline(
+        render(segments), questions, client, config
+    )
+    draft = _Draft(source, question, config, metric, tuple(segments), usage)
     if len(baseline) < 2:
-        return Report(
-            source, question, config, metric, tuple(segments), tuple(baseline),
-            _empty_floor(metric), (), Validity(False, ("the baseline could not be measured",)),
-            len(base_calls), tuple(base_errors), usage,
-            aborted="baseline failed: " + (base_errors[0] if base_errors else "no readings"),
+        reason = base_errors[0] if base_errors else "no readings"
+        return draft.abandoned(
+            baseline, _empty_floor(metric), base_calls, base_errors,
+            f"baseline failed: {reason}", "the baseline could not be measured",
         )
-    floor = measure_noise_floor(baseline, metric)
 
+    floor = measure_noise_floor(baseline, metric)
     if floor.at_resolution_limit:
         # Every baseline replicate put all its mass on one outcome. Ablation
         # could only ever flip the argmax or do nothing, which is the argmax
-        # delta this tool exists to avoid. Say so; do not spend the fan-out.
-        return Report(
-            source, question, config, metric, tuple(segments), tuple(baseline), floor, (),
-            Validity(False, ("baseline distribution is saturated — no headroom to measure into",)),
-            len(base_calls), tuple(base_errors), usage,
-            aborted="baseline is at the resolution limit",
+        # reading this tool exists to avoid. Say so; do not spend the fan-out.
+        return draft.abandoned(
+            baseline, floor, base_calls, base_errors,
+            "baseline is at the resolution limit",
+            "baseline distribution is saturated — no headroom to measure into",
         )
 
-    # --- one call per (segment, mode, replicate) ----------------------------
-    trials: list[Call] = []
+    grouped, trial_calls, trial_usage = _measure_trials(segments, questions, client, config)
+    for unit, count in trial_usage.items():
+        usage[unit] = usage.get(unit, 0) + count
+
+    failures = list(base_errors)
+    rows = [
+        _row_for(seg, grouped, baseline, floor, metric, config, failures) for seg in segments
+    ]
+    return Report(
+        source, question, config, metric, tuple(segments), tuple(baseline), floor,
+        tuple(rows), _assess(rows, floor), base_calls + trial_calls,
+        tuple(failures), usage,
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class _Draft:
+    """The fields a report carries whether or not the measurement completed."""
+
+    source: str
+    question: Question
+    config: Config
+    metric: str
+    segments: tuple[Segment, ...]
+    usage: Mapping[str, int]
+
+    def abandoned(
+        self,
+        baseline: Sequence[Reading],
+        floor: NoiseFloor,
+        calls: int,
+        errors: Sequence[str],
+        aborted: str,
+        reason: str,
+    ) -> Report:
+        return Report(
+            self.source, self.question, self.config, self.metric, self.segments,
+            tuple(baseline), floor, (), Validity(False, (reason,)), calls,
+            tuple(errors), self.usage, aborted=aborted,
+        )
+
+
+def _measure_baseline(
+    state: str,
+    questions: Mapping[str, Question],
+    client: JevClient,
+    config: Config,
+) -> tuple[list[Reading], list[str], int, dict[str, int]]:
+    """Call the unmodified document k times, each as its own request.
+
+    Separate requests are the point. Asking the same question k times inside
+    one request would measure structure within a call, which is not the
+    quantity a noise floor is for.
+    """
+    calls = [
+        Call(state, questions, BaselineTag(i)) for i in range(config.baseline_replicates)
+    ]
+    outcomes = run_calls(client, calls, config.concurrency)
+    readings, errors = _readings(outcomes)
+    return readings, errors, len(calls), _usage_of(outcomes)
+
+
+def _measure_trials(
+    segments: Sequence[Segment],
+    questions: Mapping[str, Question],
+    client: JevClient,
+    config: Config,
+) -> tuple[dict[tuple[int, Mode], list[Outcome]], int, dict[str, int]]:
+    """One call per segment, per mode, per replicate, grouped by what it measures."""
+    calls: list[Call] = []
     for seg in segments:
         for mode in config.modes:
             state = render(segments, omit=seg.index, mode=mode)
-            for rep in range(config.perturbed_replicates):
-                trials.append(Call(state, questions, TrialTag(seg.index, mode, rep)))
-    trial_out = run_calls(client, trials, config.concurrency)
-    for k, v in _usage_of(trial_out).items():
-        usage[k] = usage.get(k, 0) + v
-
+            calls.extend(
+                Call(state, questions, TrialTag(seg.index, mode, rep))
+                for rep in range(config.perturbed_replicates)
+            )
+    outcomes = run_calls(client, calls, config.concurrency)
     grouped: dict[tuple[int, Mode], list[Outcome]] = {}
-    for outcome in trial_out:
+    for outcome in outcomes:
         tag = outcome.tag
         if isinstance(tag, TrialTag):
             grouped.setdefault((tag.segment, tag.mode), []).append(outcome)
+    return grouped, len(calls), _usage_of(outcomes)
 
-    failures = list(base_errors)
-    rows: list[Row] = []
-    for seg in segments:
-        effects: dict[str, Effect] = {}
-        for mode in config.modes:
-            outcomes = grouped.get((seg.index, mode), [])
-            readings, errors = _readings(outcomes)
-            failures.extend(f"{seg.label} [{mode.value}]: {e}" for e in errors)
-            effects[mode.value] = (
-                measure_effect(baseline, readings, metric)
-                if readings
-                else failed_effect(errors[0] if errors else "no readings")
-            )
-        rows.append(Row(seg, effects, classify(effects, floor), rank_key(effects)))
 
-    validity = _assess(rows, floor)
-    return Report(
-        source, question, config, metric, tuple(segments), tuple(baseline), floor,
-        tuple(rows), validity, len(base_calls) + len(trials), tuple(failures), usage,
-    )
+def _row_for(
+    seg: Segment,
+    grouped: Mapping[tuple[int, Mode], list[Outcome]],
+    baseline: Sequence[Reading],
+    floor: NoiseFloor,
+    metric: str,
+    config: Config,
+    failures: list[str],
+) -> Row:
+    """Turn one segment's trial outcomes into its measured row."""
+    effects: dict[str, Effect] = {}
+    for mode in config.modes:
+        readings, errors = _readings(grouped.get((seg.index, mode), []))
+        failures.extend(f"{seg.label} [{mode.value}]: {e}" for e in errors)
+        effects[mode.value] = (
+            measure_effect(baseline, readings, metric)
+            if readings
+            else failed_effect(errors[0] if errors else "no readings")
+        )
+    return Row(seg, effects, classify(effects, floor), rank_key(effects))
 
 
 def _widest(row: Row) -> float:

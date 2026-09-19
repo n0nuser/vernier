@@ -49,9 +49,15 @@ from vernier.run import Config, Report, Row, Validity, ablate, baseline_haze
 from vernier.segment import SEGMENTERS, Segmenter, TilingError, segment
 from vernier.types import Mode, Question, Reading, Segment, SegmentKind
 
+# Read eagerly, and deliberately. PEP 562 would defer this one filesystem
+# lookup, but a module-level __getattr__ types every unknown attribute as
+# valid, so a consumer's typo would check clean against a package that
+# advertises py.typed. Keeping the namespace statically checkable is worth
+# more than a millisecond, and reading our own installed metadata is not the
+# kind of import-time side effect the rest of this package avoids.
 try:
     __version__ = version("vernier")
-except PackageNotFoundError:  # running from a source tree that was never installed
+except PackageNotFoundError:  # a source tree that was never installed
     __version__ = "0.0.0.dev0"
 
 __all__ = [
