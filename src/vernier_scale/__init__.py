@@ -61,6 +61,7 @@ except PackageNotFoundError:  # a source tree that was never installed
     __version__ = "0.0.0.dev0"
 
 __all__ = [
+    "SEGMENTERS",
     "Call",
     "Config",
     "ConfigurationError",
@@ -76,7 +77,6 @@ __all__ = [
     "Reading",
     "Report",
     "Row",
-    "SEGMENTERS",
     "Segment",
     "SegmentKind",
     "Segmenter",

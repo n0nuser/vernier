@@ -15,9 +15,10 @@ import threading
 import time
 import urllib.error
 import urllib.request
+from collections.abc import Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
-from typing import Mapping, Protocol, Sequence
+from typing import Protocol
 
 from vernier_scale.errors import VernierError
 from vernier_scale.types import BaselineTag, Question, QuestionType, Reading, TrialTag

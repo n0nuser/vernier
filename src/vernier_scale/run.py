@@ -7,8 +7,8 @@ spending hundreds of requests measuring into a wall.
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Mapping, Sequence
 
 from vernier_scale.client import Call, JevClient, Outcome, run_calls
 from vernier_scale.distance import normalised_entropy, primary_metric
@@ -34,6 +34,9 @@ from vernier_scale.types import (
 )
 
 QUESTION_ID = "verdict"
+
+MIN_BASELINE_REPLICATES = 2
+"""Below this there is no spread to measure, so there is no floor."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -109,7 +112,7 @@ class Report:
         return tuple(
             sorted(
                 (r for r in self.content_rows if r.verdict is Verdict.NULL),
-                key=lambda r: _widest(r),
+                key=_widest,
             )
         )
 
@@ -129,7 +132,7 @@ class Report:
         return tuple(
             sorted(
                 (r for r in self.content_rows if r.verdict is Verdict.INDETERMINATE),
-                key=lambda r: _widest(r),
+                key=_widest,
                 reverse=True,
             )
         )
@@ -166,7 +169,7 @@ def ablate(
     text: str,
     question: Question,
     client: JevClient,
-    config: Config = Config(),
+    config: Config = Config(),  # noqa: B008 - Config is frozen, so sharing one is safe
     source: str = "<text>",
 ) -> Report:
     """Measure every segment's contribution to one question's answer.
@@ -190,11 +193,15 @@ def ablate(
         render(segments), questions, client, config
     )
     draft = _Draft(source, question, config, metric, tuple(segments), usage)
-    if len(baseline) < 2:
+    if len(baseline) < MIN_BASELINE_REPLICATES:
         reason = base_errors[0] if base_errors else "no readings"
         return draft.abandoned(
-            baseline, _empty_floor(metric), base_calls, base_errors,
-            f"baseline failed: {reason}", "the baseline could not be measured",
+            baseline=baseline,
+            floor=_empty_floor(metric),
+            calls=base_calls,
+            errors=base_errors,
+            aborted=f"baseline failed: {reason}",
+            reason="the baseline could not be measured",
         )
 
     floor = measure_noise_floor(baseline, metric)
@@ -203,9 +210,12 @@ def ablate(
         # could only ever flip the argmax or do nothing, which is the argmax
         # reading this tool exists to avoid. Say so; do not spend the fan-out.
         return draft.abandoned(
-            baseline, floor, base_calls, base_errors,
-            "baseline is at the resolution limit",
-            "baseline distribution is saturated — no headroom to measure into",
+            baseline=baseline,
+            floor=floor,
+            calls=base_calls,
+            errors=base_errors,
+            aborted="baseline is at the resolution limit",
+            reason="baseline distribution is saturated — no headroom to measure into",
         )
 
     grouped, trial_calls, trial_usage = _measure_trials(segments, questions, client, config)
@@ -214,7 +224,16 @@ def ablate(
 
     failures = list(base_errors)
     rows = [
-        _row_for(seg, grouped, baseline, floor, metric, config, failures) for seg in segments
+        _row_for(
+            seg,
+            grouped=grouped,
+            baseline=baseline,
+            floor=floor,
+            metric=metric,
+            config=config,
+            failures=failures,
+        )
+        for seg in segments
     ]
     return Report(
         source, question, config, metric, tuple(segments), tuple(baseline), floor,
@@ -236,6 +255,7 @@ class _Draft:
 
     def abandoned(
         self,
+        *,
         baseline: Sequence[Reading],
         floor: NoiseFloor,
         calls: int,
@@ -296,6 +316,7 @@ def _measure_trials(
 
 def _row_for(
     seg: Segment,
+    *,
     grouped: Mapping[tuple[int, Mode], list[Outcome]],
     baseline: Sequence[Reading],
     floor: NoiseFloor,

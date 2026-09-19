@@ -31,6 +31,9 @@ jobs:
       - name: Type-check
         run: uv run --python ${{ matrix.python }} --frozen mypy
 
+      - name: Lint
+        run: uv run --frozen ruff check . --output-format github
+
   package:
     runs-on: ubuntu-latest
     steps:

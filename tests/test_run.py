@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -198,8 +199,6 @@ def test_a_choice_question_is_measured_with_jsd() -> None:
 
 
 def test_json_output_carries_the_floor_and_every_segment() -> None:
-    import json
-
     report = ablate(DOC, QUESTION, instrument(), FAST)
     payload = json.loads(render_json(report))
     assert payload["noise_floor"]["floor"] > 0

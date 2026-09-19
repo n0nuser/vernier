@@ -9,9 +9,9 @@ from vernier_scale.noise import (
     Verdict,
     classify,
     failed_effect,
+    mean_distribution,
     measure_effect,
     measure_noise_floor,
-    mean_distribution,
     permutation_p,
     rank_key,
 )

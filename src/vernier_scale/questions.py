@@ -7,7 +7,7 @@ stays available for anyone who would rather build the record directly.
 
 from __future__ import annotations
 
-from typing import Mapping, Sequence
+from collections.abc import Mapping, Sequence
 
 from vernier_scale.errors import VernierError
 from vernier_scale.types import Question

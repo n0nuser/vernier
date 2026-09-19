@@ -16,9 +16,9 @@ from __future__ import annotations
 
 import itertools
 import statistics
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from enum import Enum
-from typing import Mapping, Sequence
+from enum import StrEnum
 
 from vernier_scale.distance import (
     cross,
@@ -37,7 +37,7 @@ MAX_PERMUTATIONS = 20_000
 """Above this many splits, the exact test is sampled rather than enumerated."""
 
 
-class Verdict(str, Enum):
+class Verdict(StrEnum):
     """What the instrument can say about one measurement."""
 
     CORROBORATED = "corroborated"
@@ -169,7 +169,7 @@ def permutation_p(
     """
     pool = list(baseline) + list(perturbed)
     n, k = len(pool), len(perturbed)
-    if n < 2 or k == 0 or k == n:
+    if n < 2 or k in (0, n):
         return 1.0, 1
     observed = distance_of_means(baseline, perturbed, metric)
     indices = range(n)
@@ -311,7 +311,7 @@ def _direction(baseline: Sequence[Reading], perturbed: Sequence[Reading]) -> flo
     return after - before
 
 
-def classify(by_mode: dict[str, Effect], floor: NoiseFloor) -> Verdict:
+def classify(by_mode: dict[str, Effect], floor: NoiseFloor) -> Verdict:  # noqa: PLR0911
     """Combine the per-mode effects into one verdict.
 
     Requiring both modes to agree is right as a *label* and wrong as a gate: a

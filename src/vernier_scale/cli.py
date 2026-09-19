@@ -10,9 +10,10 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Mapping, Sequence
 
+from vernier_scale import questions
 from vernier_scale.client import (
     DEFAULT_MODEL,
     ConfigurationError,
@@ -20,10 +21,9 @@ from vernier_scale.client import (
     JevClient,
     StubJevClient,
 )
-from vernier_scale.report import render_deadweight, render_haze, render_json, render_text
-from vernier_scale import questions
 from vernier_scale.errors import VernierError
 from vernier_scale.questions import QuestionError
+from vernier_scale.report import render_deadweight, render_haze, render_json, render_text
 from vernier_scale.run import Config, Report, ablate
 from vernier_scale.segment import SEGMENTERS
 from vernier_scale.types import Mode, Question
@@ -187,7 +187,10 @@ def build_parser() -> argparse.ArgumentParser:
     common = argparse.ArgumentParser(add_help=False, parents=[question])
     common.add_argument("document", help="the document to measure, or - for stdin")
     common.add_argument(
-        "--by", default="section", choices=sorted(SEGMENTERS), help="segmentation (default: section)"
+        "--by",
+        default="section",
+        choices=sorted(SEGMENTERS),
+        help="segmentation (default: section)",
     )
     common.add_argument(
         "--mode",
@@ -219,7 +222,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     parser = argparse.ArgumentParser(
         prog="vernier",
-        description="Measure meaning by perturbing text and watching a calibrated probability move.",
+        description=(
+            "Measure meaning by perturbing text and watching a calibrated probability move."
+        ),
         epilog=(
             "examples:\n"
             "  vernier ablate rulebook.md --noul 'Does this permit a permanent ban here?'\n"

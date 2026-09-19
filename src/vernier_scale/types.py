@@ -6,9 +6,10 @@ the API client and the statistics can be tested in isolation.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from enum import Enum
-from typing import Literal, Mapping
+from enum import StrEnum
+from typing import Literal
 
 # The API reports every probability rounded to two decimal places. That is the
 # instrument's resolution and it is the reason a measured spread of zero does
@@ -16,8 +17,11 @@ from typing import Literal, Mapping
 QUANTUM = 0.01
 HALF_QUANTUM = QUANTUM / 2
 
+ONE_HOT_TOLERANCE = 1e-9
+"""Float slack when asking whether a reported probability is exactly 1."""
 
-class SegmentKind(str, Enum):
+
+class SegmentKind(StrEnum):
     """Where a segment came from."""
 
     CONTENT = "content"
@@ -47,7 +51,7 @@ class Segment:
         return self.kind is SegmentKind.PLACEBO
 
 
-class Mode(str, Enum):
+class Mode(StrEnum):
     """How a segment is removed from the document."""
 
     DELETE = "delete"
@@ -127,4 +131,4 @@ class Reading:
         except an outright flip, which is exactly what this tool exists to
         avoid relying on.
         """
-        return any(abs(p - 1.0) < 1e-9 for _, p in self.probs)
+        return any(abs(p - 1.0) < ONE_HOT_TOLERANCE for _, p in self.probs)

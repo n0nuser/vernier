@@ -29,6 +29,7 @@ jobs:
 
       - run: uv run --python ${{ matrix.python }} --frozen pytest -q
       - run: uv run --python ${{ matrix.python }} --frozen mypy
+      - run: uv run --frozen ruff check .
 
   build:
     needs: test

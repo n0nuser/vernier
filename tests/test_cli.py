@@ -2,12 +2,21 @@
 
 from __future__ import annotations
 
+import io
 import json
 from pathlib import Path
 
 import pytest
 
-from vernier_scale.cli import EXIT_INVALID, EXIT_OK, EXIT_USAGE, build_parser, build_question, main
+from vernier_scale.cli import (
+    EXIT_INVALID,
+    EXIT_OK,
+    EXIT_USAGE,
+    UsageError,
+    build_parser,
+    build_question,
+    main,
+)
 
 RULEBOOK = str(Path(__file__).resolve().parents[1] / "examples" / "contributor-covenant-2.1.md")
 SIGNAL = "A permanent ban from any sort of public interaction"
@@ -33,13 +42,17 @@ def parse(argv: list[str]) -> object:
 
 
 def test_a_noul_question_is_built_from_flags() -> None:
-    q = parse(["ablate", "doc.md", "--noul", "is it?", "--true", "yes means", "--false", "no means"])
+    q = parse(
+        ["ablate", "doc.md", "--noul", "is it?", "--true", "yes means", "--false", "no means"]
+    )
     assert q.type == "noul"  # type: ignore[attr-defined]
     assert q.payload()["criteria"] == {"true": "yes means", "false": "no means"}  # type: ignore[attr-defined]
 
 
 def test_a_choice_question_needs_two_options() -> None:
-    with pytest.raises(Exception):
+    # The CLI presents every malformed question as a usage error, so that is
+    # what a caller sees -- the blind `Exception` this replaced hid the wrapping.
+    with pytest.raises(UsageError, match="two distinct options"):
         parse(["ablate", "doc.md", "--choice", "which?", "--option", "a"])
     q = parse(["ablate", "doc.md", "--choice", "which?", "--option", "a=first", "--option", "b"])
     assert q.payload()["criteria"] == {"a": "first", "b": None}  # type: ignore[attr-defined]
@@ -54,7 +67,9 @@ def test_exactly_one_question_kind_is_required() -> None:
     with pytest.raises(Exception, match="exactly one"):
         parse(["ablate", "doc.md"])
     with pytest.raises(Exception, match="exactly one"):
-        parse(["ablate", "doc.md", "--noul", "a", "--choice", "b", "--option", "x", "--option", "y"])
+        parse(
+            ["ablate", "doc.md", "--noul", "a", "--choice", "b", "--option", "x", "--option", "y"]
+        )
 
 
 def test_a_question_file_is_accepted(tmp_path: Path) -> None:
@@ -122,14 +137,10 @@ def test_too_few_baseline_calls_is_a_usage_error() -> None:
 
 
 def test_stdin_is_accepted(monkeypatch: pytest.MonkeyPatch) -> None:
-    import io
-
     monkeypatch.setattr("sys.stdin", io.StringIO("# A\n\nalpha text here\n\n## B\n\nbeta text\n"))
     assert main(["ablate", "-", "--noul", "is it?", "--stub", "--concurrency", "8"]) == EXIT_OK
 
 
 def test_an_empty_document_is_a_usage_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    import io
-
     monkeypatch.setattr("sys.stdin", io.StringIO("   \n"))
     assert main(["ablate", "-", "--noul", "x", "--stub"]) == EXIT_USAGE

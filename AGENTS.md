@@ -86,26 +86,32 @@ no network and no key. Keep it that way — `tests/` never reaches the API.
 
 1. Write the test first when the change is behavioural. The suite is the record
    of what the instrument promises.
-2. `uv run pytest` and `uv run mypy` both clean. mypy runs strict over `src` and
-   `tests`.
+2. `uv run pytest`, `uv run mypy` and `uv run ruff check .` all clean. mypy runs
+   strict over `src` and `tests`.
 3. If you touched a statistic, run the convergence check above.
 4. If you touched rendering, run `ablate`, `deadweight` and `haze` and read
    what they print.
 5. Commit message says what changed and why it was wrong before. The history
    here explains reasoning, not just diffs.
 
-Done means: suite green, mypy clean, and every invariant your change touches
-re-verified by running something — not by reasoning about it.
+Done means: suite green, mypy and ruff clean, and every invariant your change
+touches re-verified by running something — not by reasoning about it.
 
 ## Conventions
 
-`pyproject.toml` holds a ruff config. It is not wired into the suite or CI yet
-and the tree does not pass it, so treat it as intent rather than a gate: the
-checks that actually run are `pytest` and `mypy`.
+`ruff check .` gates absolute imports, import order, docstring format, line
+length and the rest. It runs in CI beside `pytest` and `mypy`, and all three
+have to be clean.
 
-These need a human either way:
+Two rules are tuned, both for a stated reason in `pyproject.toml`: `D1xx` is off
+because the gate enforces docstring *format*, never presence, and `PLR2004` is
+off because it fires on structural minimums like `if len(levels) < 2`, where the
+literal states the rule better than a name for it would. Thresholds that are not
+self-evident carry names — `HAZE_FLAT`, `ONE_HOT_TOLERANCE`,
+`STEADY_BASELINE_REPLICATES`.
 
-- Absolute imports throughout. `from vernier_scale.x import y`, never `from .x`.
+These need a human:
+
 - Comments explain **why**. Naming carries the what.
 - Docstrings appear where they add what a signature cannot say, not on
   everything.

@@ -8,7 +8,7 @@ measurement. Total variation and Jensen-Shannon both see the reshaping.
 from __future__ import annotations
 
 import math
-from typing import Mapping, Sequence
+from collections.abc import Mapping, Sequence
 
 from vernier_scale.types import HALF_QUANTUM, Reading
 

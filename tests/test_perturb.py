@@ -54,7 +54,7 @@ def test_mask_preserves_word_count_and_list_markers() -> None:
     source = "The beta rule has parts:\n\n- first part here\n- second part here\n"
     out = match_length(source)
     assert len(out.split("\n")) == len(source.split("\n"))
-    for a, b in zip(source.split("\n"), out.split("\n")):
+    for a, b in zip(source.split("\n"), out.split("\n"), strict=True):
         assert len(a.split()) == len(b.split())
     assert out.count("- ") == source.count("- ")
 

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from typing import Iterable, Sequence
+from collections.abc import Iterable, Sequence
 
 from vernier_scale.distance import normalised_entropy
 from vernier_scale.noise import ALPHA, Effect, Verdict
@@ -12,6 +12,15 @@ from vernier_scale.types import Reading
 
 BAR = "█"
 RULE = "─"
+
+STEADY_BASELINE_REPLICATES = 8
+"""Below this the floor is a sample range small enough to understate itself."""
+
+HAZE_FLAT = 0.85
+"""Normalised entropy at or above which the document decides nothing."""
+
+HAZE_LEANING = 0.4
+"""Normalised entropy at or above which it leans without settling."""
 
 _MARK = {
     Verdict.CORROBORATED: "++",
@@ -39,7 +48,7 @@ def _reading_str(r: Reading) -> str:
 def _bar(value: float, scale: float, width: int = 18) -> str:
     if scale <= 0:
         return ""
-    filled = int(round(min(value / scale, 1.0) * width))
+    filled = round(min(value / scale, 1.0) * width)
     return BAR * filled + "·" * (width - filled)
 
 
@@ -125,7 +134,7 @@ def _baseline_block(report: Report) -> list[str]:
     out.append(
         f"  entropy spread    {floor.entropy_spread:.4f}   the floor haze is read against"
     )
-    if len(floor.replicates) < 8 and not floor.saturated:
+    if len(floor.replicates) < STEADY_BASELINE_REPLICATES and not floor.saturated:
         # A sample range runs small: at this k it usually falls short of the
         # true spread. The threshold's extra step partly covers that, but the
         # reader should know the floor itself is the soft number here.
@@ -153,7 +162,7 @@ def _power_block(report: Report) -> list[str]:
     best_p = min(1.0 / e.permutations for e in worst)
     return [
         "",
-        f"!! UNDERPOWERED: with these replicate counts the smallest reachable p-value is",
+        "!! UNDERPOWERED: with these replicate counts the smallest reachable p-value is",
         f"   {best_p:.3f}, above the {ALPHA} threshold, so nothing can be established no",
         "   matter how far it moved. Raise --baseline-calls and --trial-calls.",
     ]
@@ -185,7 +194,8 @@ def _control_block(report: Report) -> list[str]:
             Verdict.MODE_SENSITIVE,
             Verdict.FAILED,
         }
-        out.append(f"  [{'FAIL' if failed else 'pass'}] {_trim(row.segment.label, 26):<26} {detail}")
+        mark = "FAIL" if failed else "pass"
+        out.append(f"  [{mark}] {_trim(row.segment.label, 26):<26} {detail}")
     out.append("  [pass] segmentation tiles the document byte-exactly (null ablation)")
     return out
 
@@ -387,12 +397,12 @@ def _haze_verdict(haze: float, report: Report) -> list[str]:
         tail = [f"  Jev's own confidence: {conf:.2f}."]
     else:
         tail = ["  (A Noul reports no confidence; the spread of p is the whole shape.)"]
-    if haze >= 0.85:
+    if haze >= HAZE_FLAT:
         head = [
             "  The distribution is close to flat. With well-formed options that is a fact",
             "  about the input, not the model: this document does not decide the question.",
         ]
-    elif haze >= 0.4:
+    elif haze >= HAZE_LEANING:
         head = [
             "  The distribution is spread but leaning. The document points somewhere",
             "  without settling it.",

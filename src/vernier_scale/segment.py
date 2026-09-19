@@ -10,7 +10,7 @@ segmenter, not the text.
 from __future__ import annotations
 
 import re
-from typing import Callable, Sequence
+from collections.abc import Callable, Sequence
 
 from vernier_scale.errors import VernierError
 from vernier_scale.types import Segment, SegmentKind

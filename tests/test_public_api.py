@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 import vernier_scale as vernier
+from vernier_scale.cli import UsageError
 
 RULEBOOK = Path(__file__).resolve().parents[1] / "examples" / "contributor-covenant-2.1.md"
 SIGNAL = "A permanent ban from any sort of public interaction within the community."
@@ -33,8 +34,9 @@ def test_every_name_in_all_is_importable() -> None:
     assert missing == []
 
 
-def test_all_is_sorted_and_free_of_duplicates() -> None:
-    assert vernier.__all__ == sorted(set(vernier.__all__))
+def test_all_is_free_of_duplicates() -> None:
+    """Ordering is ruff's job (RUF022); a name appearing twice is this one's."""
+    assert len(vernier.__all__) == len(set(vernier.__all__))
 
 
 def test_no_private_name_is_exported() -> None:
@@ -49,14 +51,17 @@ def test_version_matches_the_installed_package_metadata() -> None:
 
 
 def test_an_unknown_attribute_raises() -> None:
-    """Nothing widens the module namespace, so a consumer's typo is caught."""
+    """Nothing widens the module namespace, so a consumer's typo is caught.
+
+    Reached through getattr because the name is deliberately absent: written as
+    a literal attribute it would fail the type check, which is the static half
+    of the same guarantee this asserts at runtime.
+    """
     with pytest.raises(AttributeError):
-        getattr(vernier, "definitely_not_exported")
+        getattr(vernier, "definitely_not_exported")  # noqa: B009
 
 
 def test_every_cli_error_is_catchable_as_a_vernier_error() -> None:
-    from vernier_scale.cli import UsageError
-
     assert issubclass(UsageError, vernier.VernierError)
 
 
@@ -70,8 +75,6 @@ def test_importing_the_package_reads_nothing_and_calls_nothing(
 ) -> None:
     """No import-time side effects: no environment reads, no network, no output."""
     monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
-    for module in list(vars(vernier)):
-        pass
     reloaded = importlib.reload(vernier)
     assert reloaded.__all__
 

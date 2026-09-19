@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import re
 from collections import Counter
-from typing import Sequence
+from collections.abc import Sequence
 
 from vernier_scale.filler import PLACEBO_SECTIONS, match_length, neutral_heading
 from vernier_scale.types import Mode, Segment, SegmentKind
