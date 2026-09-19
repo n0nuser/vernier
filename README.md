@@ -109,7 +109,10 @@ against the public surface passes.
 ## A real measurement
 
 The Contributor Covenant 2.1 is in `examples/`. It has a four-rung consequence
-ladder, so it is a good document to ask a proportionality question of:
+ladder, so it is a good document to ask a proportionality question of. (It is a
+test fixture, not this project's own code of conduct; it is licensed
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), unlike the rest of
+this repository, and the file records the one change made to it.)
 
 > A contributor has, over several months and after a prior written warning,
 > repeatedly made derogatory remarks about contributors of a particular
