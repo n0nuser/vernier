@@ -5,10 +5,10 @@ from __future__ import annotations
 import json
 from typing import Iterable, Sequence
 
-from .distance import normalised_entropy
-from .noise import ALPHA, Effect, Verdict
-from .run import Report, Row, agreed_entropy_shift, baseline_haze
-from .types import Reading
+from vernier.distance import normalised_entropy
+from vernier.noise import ALPHA, Effect, Verdict
+from vernier.run import Report, Row, agreed_entropy_shift, baseline_haze
+from vernier.types import Reading
 
 BAR = "█"
 RULE = "─"
@@ -87,12 +87,13 @@ def render_text(report: Report, show_null: bool = True) -> str:
         return "\n".join(out)
 
     out.extend(_ranking_block(report))
+    out.extend(_failed_block(report))
     if show_null:
         out.append("")
         out.extend(_null_block(report))
     if report.failures:
         out.append("")
-        out.append(f"!! {len(report.failures)} call(s) failed — affected rows are marked XX:")
+        out.append(f"!! {len(report.failures)} call(s) failed:")
         for f in report.failures[:5]:
             out.append(f"   {_trim(f, w - 3)}")
     return "\n".join(out)
@@ -124,6 +125,14 @@ def _baseline_block(report: Report) -> list[str]:
     out.append(
         f"  entropy spread    {floor.entropy_spread:.4f}   the floor haze is read against"
     )
+    if len(floor.replicates) < 8 and not floor.saturated:
+        # A sample range runs small: at this k it usually falls short of the
+        # true spread. The threshold's extra step partly covers that, but the
+        # reader should know the floor itself is the soft number here.
+        out.append(
+            f"  note: estimated from {len(floor.replicates)} replicates, which tends to"
+        )
+        out.append("        under-state the spread. --baseline-calls 8 steadies it.")
     if floor.saturated:
         out.append(
             "  !! baseline is one-hot: the question has no headroom left to measure into."
@@ -198,9 +207,14 @@ def _row_line(row: Row, scale: float, modes: Iterable[str]) -> list[str]:
             per_mode.append(f"      {mode:<7} failed: {_trim(e.error or '', 40)}")
             continue
         arrow = "↓" if e.direction < 0 else "↑"
+        # Entropy and Jev's own confidence ride alongside the distance: a
+        # segment can move the distribution without changing how sure the
+        # model is, and the difference between those two is worth seeing.
+        conf = f" conf{e.confidence_delta:+.2f}" if e.confidence_delta is not None else ""
         per_mode.append(
             f"      {mode:<7} {e.size:.4f}  p={e.p_value:.3f}  "
-            f"{arrow}{abs(e.direction):.2f}  {_bar(e.size, scale)}"
+            f"{arrow}{abs(e.direction):.2f}  H{e.entropy_delta:+.3f}{conf}"
+            f"  {_bar(e.size, scale)}"
         )
     return [head, *per_mode]
 
@@ -247,6 +261,26 @@ def _widest_size(row: Row) -> float:
 def _detectable(row: Row) -> bool:
     """True when a mode separated this segment from jitter despite its small size."""
     return any(e.ok and e.p_value <= ALPHA for e in row.effects.values())
+
+
+def _failed_block(report: Report) -> list[str]:
+    """Name the segments a failed call left unmeasured."""
+    rows = report.unmeasured
+    if not rows:
+        return []
+    out = [
+        "",
+        f"XX UNMEASURED  ({len(rows)} segments — a call did not come back)",
+        "  These are not findings and they are not deadweight. Nothing is known",
+        "  about them; re-run before drawing any conclusion that depends on them.",
+    ]
+    for row in rows:
+        detail = "  ".join(
+            f"{mode}={_trim(e.error or 'failed', 34)}" if not e.ok else f"{mode}=ok"
+            for mode, e in row.effects.items()
+        )
+        out.append(f"   XX {_trim(row.segment.label, 36):<36} {detail}")
+    return out
 
 
 def _null_block(report: Report) -> list[str]:
@@ -310,6 +344,7 @@ def render_deadweight(report: Report) -> str:
             out.append(
                 "  be jitter, and is still smaller than this run can call meaningful."
             )
+    out.extend(_failed_block(report))
     undecided = report.indeterminate
     if undecided:
         out.append("")

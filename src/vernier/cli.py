@@ -13,11 +13,18 @@ import sys
 from pathlib import Path
 from typing import Sequence
 
-from .client import DEFAULT_MODEL, HttpJevClient, JevClient, StubJevClient
-from .report import render_deadweight, render_haze, render_json, render_text
-from .run import Config, Report, run_ablate
-from .segment import SEGMENTERS
-from .types import Mode, Question
+from vernier.client import (
+    DEFAULT_MODEL,
+    ConfigurationError,
+    HttpJevClient,
+    JevClient,
+    StubJevClient,
+)
+from vernier.report import render_deadweight, render_haze, render_json, render_text
+from vernier.errors import VernierError
+from vernier.run import Config, Report, run_ablate
+from vernier.segment import SEGMENTERS
+from vernier.types import Mode, Question
 
 EXIT_OK = 0
 EXIT_INVALID = 1
@@ -84,7 +91,12 @@ def build_client(args: argparse.Namespace) -> JevClient:
             sensitive={args.stub_sensitive: args.stub_shift} if args.stub_sensitive else {},
             seed=args.stub_seed,
         )
-    return HttpJevClient(model=args.model, timeout=args.timeout, retries=args.retries)
+    try:
+        return HttpJevClient.from_environment(
+            model=args.model, timeout=args.timeout, retries=args.retries
+        )
+    except ConfigurationError as exc:
+        raise UsageError(str(exc)) from exc
 
 
 def build_config(args: argparse.Namespace) -> Config:
@@ -236,7 +248,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         return EXIT_USAGE
     except KeyboardInterrupt:
         return 130
-    except Exception as exc:  # noqa: BLE001 - the CLI boundary
+    except VernierError as exc:
+        # Everything vernier raises deliberately. A traceback from anything
+        # else is a bug, and swallowing it here would hide it.
         print(f"vernier: {type(exc).__name__}: {exc}", file=sys.stderr)
         return EXIT_ERROR
 

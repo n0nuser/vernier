@@ -13,8 +13,8 @@ import re
 from collections import Counter
 from typing import Sequence
 
-from .filler import PLACEBO_SECTIONS, match_length, neutral_heading
-from .types import Mode, Segment, SegmentKind
+from vernier.filler import PLACEBO_SECTIONS, match_length, neutral_heading
+from vernier.types import Mode, Segment, SegmentKind
 
 _HEADING_LINE = re.compile(r"^(#{1,6})[ \t]+.+$")
 _BLANK_RUN = re.compile(r"\n{3,}")

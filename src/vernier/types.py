@@ -78,6 +78,26 @@ class Question:
 
 
 @dataclass(frozen=True, slots=True)
+class TrialTag:
+    """Which measurement a call belongs to.
+
+    Calls come back from the thread pool in order but are grouped afterwards,
+    so each one carries the coordinates of the trial it serves.
+    """
+
+    segment: int
+    mode: Mode
+    replicate: int
+
+
+@dataclass(frozen=True, slots=True)
+class BaselineTag:
+    """One of the unmodified-document calls that establish the noise floor."""
+
+    replicate: int
+
+
+@dataclass(frozen=True, slots=True)
 class Reading:
     """One answer from Jev, normalised to a probability distribution.
 

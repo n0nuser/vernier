@@ -20,8 +20,16 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Mapping, Sequence
 
-from .distance import cross, distance, normalised_entropy, pairwise, resolution_limit
-from .types import Reading
+from vernier.distance import (
+    cross,
+    distance,
+    jsd,
+    normalised_entropy,
+    pairwise,
+    resolution_limit,
+    tvd,
+)
+from vernier.types import Reading
 
 ALPHA = 0.05
 """Significance level for the permutation test."""
@@ -191,8 +199,7 @@ def distance_of_means(
 
 
 def _metric(p: Mapping[str, float], q: Mapping[str, float], metric: str) -> float:
-    from .distance import jsd, tvd
-
+    """Dispatch a metric over bare distributions rather than readings."""
     return tvd(p, q) if metric == "tvd" else jsd(p, q)
 
 
@@ -235,8 +242,7 @@ class Effect:
 
         This is an equivalence claim rather than a failure to reject, and it is
         what ``deadweight`` needs. It is only meaningful when the run had the
-        power to have seen an effect — see :meth:`underpowered` — which is why
-        :func:`classify` checks both.
+        power to have seen an effect, which is why classify checks both.
 
         Note what it does *not* say: a segment can be negligible here and still
         have a p-value below alpha. That combination means the movement is

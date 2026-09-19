@@ -8,11 +8,11 @@ spending hundreds of requests measuring into a wall.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Mapping, Sequence, cast
+from typing import Mapping, Sequence
 
-from .client import Call, JevClient, Outcome, run_calls
-from .distance import normalised_entropy, primary_metric
-from .noise import (
+from vernier.client import Call, JevClient, Outcome, run_calls
+from vernier.distance import normalised_entropy, primary_metric
+from vernier.noise import (
     Effect,
     NoiseFloor,
     Verdict,
@@ -22,9 +22,9 @@ from .noise import (
     measure_noise_floor,
     rank_key,
 )
-from .perturb import inject_placebos, render
-from .segment import segment as split
-from .types import Mode, Question, Reading, Segment, SegmentKind
+from vernier.perturb import inject_placebos, render
+from vernier.segment import segment as split
+from vernier.types import BaselineTag, Mode, Question, Reading, Segment, SegmentKind, TrialTag
 
 QUESTION_ID = "verdict"
 
@@ -107,6 +107,16 @@ class Report:
         )
 
     @property
+    def unmeasured(self) -> tuple[Row, ...]:
+        """Segments a failed call left unmeasured.
+
+        These belong in the report body, not in a footnote. A segment nobody
+        could measure is not a segment that does not matter, and leaving it out
+        of every block would say exactly that by omission.
+        """
+        return tuple(r for r in self.content_rows if r.verdict is Verdict.FAILED)
+
+    @property
     def indeterminate(self) -> tuple[Row, ...]:
         """Segments whose interval straddles the threshold — neither shown nor cleared."""
         return tuple(
@@ -160,7 +170,8 @@ def run_ablate(
 
     # --- baseline and noise floor, before anything else is spent ------------
     base_calls = [
-        Call(baseline_state, questions, ("baseline", i)) for i in range(config.baseline_replicates)
+        Call(baseline_state, questions, BaselineTag(i))
+        for i in range(config.baseline_replicates)
     ]
     base_out = run_calls(client, base_calls, config.concurrency)
     baseline, base_errors = _readings(base_out)
@@ -191,22 +202,23 @@ def run_ablate(
         for mode in config.modes:
             state = render(segments, omit=seg.index, mode=mode)
             for rep in range(config.perturbed_replicates):
-                trials.append(Call(state, questions, (seg.index, mode.value, rep)))
+                trials.append(Call(state, questions, TrialTag(seg.index, mode, rep)))
     trial_out = run_calls(client, trials, config.concurrency)
     for k, v in _usage_of(trial_out).items():
         usage[k] = usage.get(k, 0) + v
 
-    grouped: dict[tuple[int, str], list[Outcome]] = {}
+    grouped: dict[tuple[int, Mode], list[Outcome]] = {}
     for outcome in trial_out:
-        tag = cast(tuple[int, str, int], outcome.tag)
-        grouped.setdefault((tag[0], tag[1]), []).append(outcome)
+        tag = outcome.tag
+        if isinstance(tag, TrialTag):
+            grouped.setdefault((tag.segment, tag.mode), []).append(outcome)
 
     failures = list(base_errors)
     rows: list[Row] = []
     for seg in segments:
         effects: dict[str, Effect] = {}
         for mode in config.modes:
-            outcomes = grouped.get((seg.index, mode.value), [])
+            outcomes = grouped.get((seg.index, mode), [])
             readings, errors = _readings(outcomes)
             failures.extend(f"{seg.label} [{mode.value}]: {e}" for e in errors)
             effects[mode.value] = (

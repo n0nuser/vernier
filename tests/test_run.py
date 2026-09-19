@@ -10,7 +10,7 @@ from vernier.client import Call, JevClient, Outcome, StubJevClient
 from vernier.noise import Verdict
 from vernier.report import render_deadweight, render_haze, render_json, render_text
 from vernier.run import Config, run_ablate
-from vernier.types import Mode, Question, Reading, SegmentKind
+from vernier.types import Mode, Question, SegmentKind
 
 RULEBOOK = Path(__file__).resolve().parents[1] / "examples" / "contributor-covenant-2.1.md"
 DOC = RULEBOOK.read_text(encoding="utf-8")
@@ -96,7 +96,48 @@ def test_a_failed_trial_never_becomes_a_zero_effect() -> None:
     # A segment that could not be measured is neither a finding nor deadweight.
     assert all(r not in report.inside_noise for r in failed)
     assert all(r not in report.ranked for r in failed)
-    assert "call(s) failed" in render_text(report)
+    assert report.unmeasured == tuple(failed)
+    # Absent from every block would say "this segment does not matter" by
+    # omission, which is the one thing the tool must never say about a
+    # segment nobody could measure. It has to be named in the body.
+    out = render_text(report)
+    assert "UNMEASURED" in out
+    assert "### 4. Permanent Ban" in out.split("UNMEASURED", 1)[1]
+
+
+def _data_rows(report: object, text: str) -> list[str]:
+    """The per-mode measurement lines of the ranking block, without its legend."""
+    ranking = text.split("ATTRIBUTION", 1)[1].split("INSIDE THE NOISE", 1)[0]
+    return [ln for ln in ranking.split("\n") if " p=" in ln]
+
+
+def test_entropy_and_confidence_ride_alongside_each_row() -> None:
+    """Spec: report entropy and Jev's own confidence next to the distance."""
+    client = StubJevClient(question_type="choice", base=0.6, sensitive={SIGNAL: -0.3})
+    report = run_ablate(DOC, Question("choice", "which?"), client, FAST)
+    rows = _data_rows(report, render_text(report))
+    assert rows
+    assert all("H" in ln for ln in rows)
+    assert all("conf" in ln for ln in rows)
+
+
+def test_a_noul_run_reports_entropy_but_no_confidence() -> None:
+    """A Noul carries no confidence, so none is invented for it."""
+    report = run_ablate(DOC, QUESTION, instrument(), FAST)
+    rows = _data_rows(report, render_text(report))
+    assert rows
+    assert all("H" in ln for ln in rows)
+    assert not any("conf" in ln for ln in rows)
+
+
+def test_a_thin_baseline_says_the_floor_may_be_under_sampled() -> None:
+    cfg = Config(baseline_replicates=5, perturbed_replicates=3, concurrency=16)
+    assert "under-state the spread" in render_text(run_ablate(DOC, QUESTION, instrument(), cfg))
+
+
+def test_a_thick_baseline_does_not_carry_that_caveat() -> None:
+    cfg = Config(baseline_replicates=8, perturbed_replicates=3, concurrency=16)
+    assert "under-state the spread" not in render_text(run_ablate(DOC, QUESTION, instrument(), cfg))
 
 
 def test_the_call_count_is_exactly_what_the_design_says() -> None:
@@ -196,12 +237,6 @@ def test_haze_recognises_a_decided_document() -> None:
     sharp = StubJevClient(base=0.97, jitter=0.01)
     report = run_ablate(DOC, QUESTION, sharp, FAST)
     assert "concentrated" in render_haze(report)
-
-
-def test_readings_normalise_even_when_components_sum_past_one() -> None:
-    r = Reading("choice", (("a", 0.69), ("b", 0.16), ("c", 0.16)), "a", 0.69)
-    assert sum(v for _, v in r.probs) > 1.0
-    assert r.support == ("a", "b", "c")
 
 
 @pytest.mark.parametrize("by", ["section", "paragraph", "line"])

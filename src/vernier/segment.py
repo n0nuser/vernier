@@ -1,10 +1,10 @@
 """Pluggable segmenters.
 
 Every segmenter tiles the document exactly: the spans it returns are
-contiguous, non-overlapping and cover ``[0, len(text))``. :func:`verify_tiling`
-enforces that, which is the null-ablation control done statically — if the
-segmenter cannot rebuild the document byte-for-byte, any number it goes on to
-produce is measuring the segmenter, not the text.
+contiguous, non-overlapping and cover the whole document. Verifying that is
+the null-ablation control, done statically — if the segmenter cannot rebuild
+the document byte-for-byte, any number it goes on to produce is measuring the
+segmenter, not the text.
 """
 
 from __future__ import annotations
@@ -12,12 +12,13 @@ from __future__ import annotations
 import re
 from typing import Callable, Sequence
 
-from .types import Segment, SegmentKind
+from vernier.errors import VernierError
+from vernier.types import Segment, SegmentKind
 
 Segmenter = Callable[[str], list[Segment]]
 
 
-class TilingError(ValueError):
+class TilingError(VernierError, ValueError):
     """A segmenter produced spans that do not rebuild the document."""
 
 

@@ -1,6 +1,6 @@
 """The System One client, and a stub that stands in for it.
 
-The whole suite runs against :class:`StubJevClient`: no network, no key. The
+The whole suite runs against the stub client: no network, no key. The
 protocol is narrow on purpose — one method, one request — because everything
 interesting in vernier happens in how many times that method is called and with
 what, not in the call itself.
@@ -19,7 +19,8 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import Mapping, Protocol, Sequence
 
-from .types import Question, QuestionType, Reading
+from vernier.errors import VernierError
+from vernier.types import BaselineTag, Question, QuestionType, Reading, TrialTag
 
 DEFAULT_BASE_URL = "https://api.typesafe.ai"
 DEFAULT_MODEL = "jev-latest"
@@ -31,7 +32,7 @@ BASE_URL_ENV = "TYPESAFE_BASE_URL"
 RETRY_STATUSES = frozenset({429, 500, 502, 503, 504, 529})
 
 
-class JevError(RuntimeError):
+class JevError(VernierError, RuntimeError):
     """A call did not produce a usable answer."""
 
 
@@ -41,7 +42,7 @@ class Call:
 
     state: str
     questions: Mapping[str, Question]
-    tag: object = None
+    tag: TrialTag | BaselineTag | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,7 +54,7 @@ class Outcome:
     segment does not matter".
     """
 
-    tag: object
+    tag: TrialTag | BaselineTag | None
     readings: Mapping[str, Reading] | None
     error: str | None = None
     usage: Mapping[str, int] = field(default_factory=dict)
@@ -103,7 +104,14 @@ def reading_from_answer(answer: Mapping[str, object]) -> Reading:
 
 
 class JevClient(Protocol):
-    """What the rest of vernier needs from an API."""
+    """What the rest of vernier needs from an API.
+
+    Two implementations ship and are swapped at runtime: HttpJevClient, which
+    calls the System One endpoint, and StubJevClient, which the test suite and
+    the --stub flag use to run the whole pipeline with no network and no key.
+    A caller embedding vernier can supply a third — a recorded fixture, a cache,
+    a different model — by satisfying this one method.
+    """
 
     def evaluate(self, call: Call) -> Outcome: ...
 
@@ -122,24 +130,46 @@ def run_calls(client: JevClient, calls: Sequence[Call], concurrency: int = 8) ->
         return list(pool.map(client.evaluate, calls))
 
 
+class ConfigurationError(VernierError):
+    """The client cannot be built from what the environment provides."""
+
+
 @dataclass
 class HttpJevClient:
-    """Talks to POST /v1/systemone."""
+    """Talks to POST /v1/systemone.
 
+    The key is a constructor argument rather than something read from the
+    environment on the way past, so a caller embedding vernier can hold several
+    clients, or none, without the library reaching for process state behind its
+    back. from_environment covers the command line's case.
+    """
+
+    api_key: str
     model: str = DEFAULT_MODEL
-    api_key: str | None = None
-    base_url: str | None = None
+    base_url: str = DEFAULT_BASE_URL
     timeout: float = 60.0
     retries: int = 4
+    _lock: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False)
+    _calls: int = field(default=0, init=False, repr=False)
 
-    def __post_init__(self) -> None:
-        self._key = self.api_key or os.environ.get(API_KEY_ENV)
-        self._url = (
-            (self.base_url or os.environ.get(BASE_URL_ENV) or DEFAULT_BASE_URL).rstrip("/")
-            + "/v1/systemone"
-        )
-        self._calls = 0
-        self._lock = threading.Lock()
+    @classmethod
+    def from_environment(cls, **overrides: object) -> HttpJevClient:
+        """Build a client from TYPESAFE_API_KEY, failing before any call is made.
+
+        Raises:
+            ConfigurationError: if no API key is set.
+        """
+        key = os.environ.get(API_KEY_ENV)
+        if not key:
+            raise ConfigurationError(
+                f"{API_KEY_ENV} is not set (get a key at console.typesafe.ai/keys)"
+            )
+        base = os.environ.get(BASE_URL_ENV) or DEFAULT_BASE_URL
+        return cls(api_key=key, base_url=base, **overrides)  # type: ignore[arg-type]
+
+    @property
+    def endpoint(self) -> str:
+        return self.base_url.rstrip("/") + "/v1/systemone"
 
     @property
     def call_count(self) -> int:
@@ -147,8 +177,6 @@ class HttpJevClient:
             return self._calls
 
     def evaluate(self, call: Call) -> Outcome:
-        if not self._key:
-            return Outcome(call.tag, None, f"{API_KEY_ENV} is not set")
         payload = {
             "state": call.state,
             "model": self.model,
@@ -181,10 +209,10 @@ class HttpJevClient:
     def _post(self, body: bytes) -> dict[str, object]:
         for attempt in range(self.retries + 1):
             req = urllib.request.Request(
-                self._url,
+                self.endpoint,
                 data=body,
                 headers={
-                    "Authorization": f"Bearer {self._key}",
+                    "Authorization": f"Bearer {self.api_key}",
                     "Content-Type": "application/json",
                     "User-Agent": "vernier/0.1",
                 },
@@ -247,10 +275,8 @@ class StubJevClient:
     question_type: QuestionType = "noul"
     options: Sequence[str] = ("yes", "no", "unclear")
     fail_on: Sequence[str] = ()
-
-    def __post_init__(self) -> None:
-        self._calls = 0
-        self._lock = threading.Lock()
+    _lock: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False)
+    _calls: int = field(default=0, init=False, repr=False)
 
     @property
     def call_count(self) -> int:

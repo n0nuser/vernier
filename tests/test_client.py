@@ -12,7 +12,7 @@ from vernier.client import (
     reading_from_answer,
     run_calls,
 )
-from vernier.types import Question
+from vernier.types import BaselineTag, Question
 
 Q = {"verdict": Question("noul", "does it?")}
 
@@ -109,9 +109,9 @@ def test_a_failure_is_a_value_not_an_exception() -> None:
 
 def test_run_calls_preserves_order_and_counts_every_call() -> None:
     client = StubJevClient()
-    calls = [Call(f"doc {i}", Q, i) for i in range(20)]
+    calls = [Call(f"doc {i}", Q, BaselineTag(i)) for i in range(20)]
     outs = run_calls(client, calls, concurrency=6)
-    assert [o.tag for o in outs] == list(range(20))
+    assert [o.tag for o in outs] == [BaselineTag(i) for i in range(20)]
     assert client.call_count == 20
 
 
