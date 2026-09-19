@@ -7,7 +7,7 @@ requires-python = ">=3.12"
 license = "MIT"
 license-files = ["LICENSE"]
 keywords = ["typesafe", "jev", "ablation", "attribution", "interpretability", "nlp"]
-authors = [{ name = "n0nuser", email = "gonzrubio.pablo@gmail.com" }]
+authors = [{ name = "n0nuser", email = "n0nuser@users.noreply.github.com" }]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: Console",
