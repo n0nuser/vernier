@@ -125,11 +125,15 @@ These need a human:
 
 ## Releasing
 
-The tag is the release. `git tag v0.2.0 && git push origin v0.2.0` runs the
+The tag is the release. `git tag v0.1.2 && git push origin v0.1.2` runs the
 suite, sets the version in `pyproject.toml` from the tag, and publishes to PyPI
 through Trusted Publishing. No token exists in the repo or its secrets. The
 workflow refuses to upload if the artifacts disagree with the tag, or if PyPI
 already has that version — a version number can never be reused.
+
+The pipeline sets that version in its own checkout and does not commit it back,
+so after a release bump `pyproject.toml` on `main` to match what shipped. It is
+a record of the last release, not the input to the next one: the tag is.
 
 ## Not in the repository, on purpose
 
